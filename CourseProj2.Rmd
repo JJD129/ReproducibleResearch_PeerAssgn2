@@ -7,9 +7,78 @@ Jennifer Dimaano
 
 ### Synopsis
 
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
 
 ### Data Processing
 
+#### Libraries
+
+```{r, echo=TRUE}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(markdown)
+library(rmarkdown)
+```
+
+#### Loading Data
+
+```{r, echo=TRUE}
+if(!exists("storm.data")) {
+    storm.data <- read.csv(bzfile("repdata_data_StormData.csv.bz2"),header = TRUE)
+  }
+```
+
+Data Structure
+
+```{r, echo=True}
+dim(storm.data)
+str(storm.data)
+```
+
+Variables that will be used:
+
+EVTYPE: Event Type (Tornados, Flood, ….)
+
+FATALITIES: Number of Fatalities
+
+INJURIES: Number of Injuries
+
+PROGDMG: Property Damage
+
+PROPDMGEXP: Units for Property Damage (magnitudes - K,B,M)
+
+CROPDMG: Crop Damage
+
+CROPDMGEXP: Units for Crop Damage (magnitudes - K,BM,B)
+
+```{r, echo=True}
+var <- c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
+storm.data <- storm.data[var]
+dim(storm.data)
+```
+checking data
+```{r, echo=True}
+head(storm.data)
+tail(storm.data)
+sum(is.na(storm.data$EVTYPE))
+sum(is.na(storm.data$FATALITIES))
+sum(is.na(storm.data$INJURIES))
+sum(is.na(storm.data$PROGDMG))
+sum(is.na(storm.data$PROPDMGEXP))
+sum(is.na(storm.data$CROPDMG))
+sum(is.na(storm.data$CROPDMGEXP))
+
+```
+
+Transforming variables
+```{r, echo=TRUE}
+sort(table(storm.data$EVTYPE), decreasing = TRUE)
+
+```
 
 ### Analysis
 
