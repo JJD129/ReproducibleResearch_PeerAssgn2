@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 Reproducible Research: Peer Assessment 2
 ==========================================
 Jennifer Dimaano
@@ -22,6 +27,9 @@ library(dplyr)
 library(knitr)
 library(markdown)
 library(rmarkdown)
+library(lattice)
+knitr::opts_chunk$set(error = TRUE)
+
 ```
 
 #### Loading Data
@@ -34,7 +42,7 @@ if(!exists("storm.data")) {
 
 Data Structure
 
-```{r, echo=True}
+```{r, echo=TRUE}
 dim(storm.data)
 str(storm.data)
 ```
@@ -55,15 +63,16 @@ CROPDMG: Crop Damage
 
 CROPDMGEXP: Units for Crop Damage (magnitudes - K,BM,B)
 
-```{r, echo=True}
+```{r, echo=TRUE}
 var <- c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
 storm.data <- storm.data[var]
 dim(storm.data)
 ```
 checking data
-```{r, echo=True}
+```{r, echo=TRUE}
 head(storm.data)
 tail(storm.data)
+# NAs in variables
 sum(is.na(storm.data$EVTYPE))
 sum(is.na(storm.data$FATALITIES))
 sum(is.na(storm.data$INJURIES))
@@ -71,17 +80,117 @@ sum(is.na(storm.data$PROGDMG))
 sum(is.na(storm.data$PROPDMGEXP))
 sum(is.na(storm.data$CROPDMG))
 sum(is.na(storm.data$CROPDMGEXP))
+# checking dollar amounts 
+sort(table(storm.data$PROPDMGEXP), decreasing = TRUE)[1:10]
+sort(table(storm.data$CROPDMGEXP), decreasing = TRUE)[1:10]
+# checking top 10 events
+sort(table(storm.data$EVTYPE), decreasing = TRUE)[1:10]
 
 ```
 
 Transforming variables
-```{r, echo=TRUE}
-sort(table(storm.data$EVTYPE), decreasing = TRUE)
 
+Group rest of values into the top 10 events by using keyword association. Events not associated with the top 10 keywords will be recorede as "OTHER." New variable EVENT is will hold the transformed records
+```{r, echo=TRUE}
+# create a new variable EVENT to transform variable EVTYPE in groups
+storm.data$EVENT <- "OTHER"
+# group by keyword in EVTYPE
+storm.data$EVENT[grep("HAIL", storm.data$EVTYPE, ignore.case = TRUE)] <- "HAIL"
+storm.data$EVENT[grep("HEAT", storm.data$EVTYPE, ignore.case = TRUE)] <- "HEAT"
+storm.data$EVENT[grep("FLOOD", storm.data$EVTYPE, ignore.case = TRUE)] <- "FLOOD"
+storm.data$EVENT[grep("WIND", storm.data$EVTYPE, ignore.case = TRUE)] <- "WIND"
+storm.data$EVENT[grep("STORM", storm.data$EVTYPE, ignore.case = TRUE)] <- "STORM"
+storm.data$EVENT[grep("SNOW", storm.data$EVTYPE, ignore.case = TRUE)] <- "SNOW"
+storm.data$EVENT[grep("TORNADO", storm.data$EVTYPE, ignore.case = TRUE)] <- "TORNADO"
+storm.data$EVENT[grep("WINTER", storm.data$EVTYPE, ignore.case = TRUE)] <- "WINTER"
+storm.data$EVENT[grep("RAIN", storm.data$EVTYPE, ignore.case = TRUE)] <- "RAIN"
+# listing the transformed event types 
+sort(table(storm.data$EVENT), decreasing = TRUE)
+```
+
+Units need to be transformed. Below are the dollar conventions from [NOAA](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf):
+* K or k: thousand dollars (10^3)
+* M or m: million dollars (10^6)
+* B or b: billion dollars (10^9)
+* the rest would be consider as dollars
+
+New variable(s) is product of value of damage and dollar unit.
+```{r, echo=TRUE}
+storm.data$PROPDMGEXP <- as.character(storm.data$PROPDMGEXP)
+storm.data$PROPDMGEXP[is.na(storm.data$PROPDMGEXP)] <- 0 # NA's considered as dollars
+storm.data$PROPDMGEXP[!grepl("K|M|B", storm.data$PROPDMGEXP, ignore.case = TRUE)] <- 0 # everything exept K,M,B is dollar
+storm.data$PROPDMGEXP[grep("K", storm.data$PROPDMGEXP, ignore.case = TRUE)] <- "3"
+storm.data$PROPDMGEXP[grep("M", storm.data$PROPDMGEXP, ignore.case = TRUE)] <- "6"
+storm.data$PROPDMGEXP[grep("B", storm.data$PROPDMGEXP, ignore.case = TRUE)] <- "9"
+storm.data$PROPDMGEXP <- as.numeric(as.character(storm.data$PROPDMGEXP))
+storm.data$property.damage <- storm.data$PROPDMG * 10^storm.data$PROPDMGEXP
+
+storm.data$CROPDMGEXP <- as.character(storm.data$CROPDMGEXP)
+storm.data$CROPDMGEXP[is.na(storm.data$CROPDMGEXP)] <- 0 # NA's considered as dollars
+storm.data$CROPDMGEXP[!grepl("K|M|B", storm.data$CROPDMGEXP, ignore.case = TRUE)] <- 0 # everything exept K,M,B is dollar
+storm.data$CROPDMGEXP[grep("K", storm.data$CROPDMGEXP, ignore.case = TRUE)] <- "3"
+storm.data$CROPDMGEXP[grep("M", storm.data$CROPDMGEXP, ignore.case = TRUE)] <- "6"
+storm.data$CROPDMGEXP[grep("B", storm.data$CROPDMGEXP, ignore.case = TRUE)] <- "9"
+storm.data$CROPDMGEXP <- as.numeric(as.character(storm.data$CROPDMGEXP))
+storm.data$crop.damage <- storm.data$CROPDMG * 10^storm.data$CROPDMGEXP
 ```
 
 ### Analysis
 
+Economic impact analysis
+```{r, echo=TRUE}
+storm.data.damage <- storm.data %>%
+  select(EVENT, property.damage,crop.damage) %>%
+  group_by(EVENT) %>%
+  summarise(total.dmg = sum(property.damage,crop.damage)) %>%
+  arrange(-total.dmg)
+head(storm.data.damage)
 
+```
+
+Public health impact analysis
+```{r, echo=TRUE}
+# Fatalities
+storm.data.fatalities <- storm.data %>% 
+  select(EVENT, FATALITIES) %>% 
+  group_by(EVENT) %>% 
+  summarise(total.fatalities = sum(FATALITIES)) %>%
+  arrange(-total.fatalities)
+head(storm.data.fatalities, 10)
+
+# Injuries
+storm.data.injuries <- storm.data %>% select(EVENT, INJURIES) %>% group_by(EVENT) %>% summarise(total.injuries = sum(INJURIES)) %>% arrange(-total.injuries)
+head(storm.data.injuries, 10)
+```
 
 ### Results
+```{r, echo=TRUE}
+Fatalities <- ggplot(storm.data.fatalities, aes(x=reorder(EVENT, -total.fatalities), y=total.fatalities)) +
+  geom_bar(stat = "identity") +
+  xlab("Event") + 
+  ylab("Total Fatalities") +
+  ggtitle("Top 10 Severe Storm Events - Fatalities") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Injuries <- ggplot(storm.data.injuries, aes(x=reorder(EVENT, -total.injuries), y=total.injuries)) +
+  geom_bar(stat = "identity") +
+  xlab("Event") + 
+  ylab("Total Injuries") +
+  ggtitle("Top 10 Severe Storm Events - Injuries") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Damages <- ggplot(storm.data.damage, aes(x=reorder(EVENT, -total.dmg), y=(total.dmg/1000000000))) +
+  geom_bar(stat = "identity") +
+  xlab("Event") + 
+  ylab("Total Damages ($ in Billions)") +
+  ggtitle("Top Severe Storm Events with the largest Economic Impact") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+print(Fatalities)
+print(Injuries)
+print(Damages)
+```
+
+Tornados make up the largest public health impact resulting in 91,407 annual injuries and 5,661 annual fatalities. Heat and other severe storm events follow after Tornados. Hail makes up the least amount of fatalities at 15, while rain produces only 305 injuries over a year.
+
+In terms of economic impact, flood damaage resulted in over \$179B. While Tornados made up a fraction of that damage at \$5B.
